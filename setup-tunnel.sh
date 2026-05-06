@@ -25,13 +25,18 @@ ask()  { local p="$1" d="${2-}" v; if [ -n "$d" ]; then read -r -p "$p [$d]: " v
 SSH_CFG="${HOME}/.ssh/config"
 [ -f "$SSH_CFG" ] || { err "Не найден $SSH_CFG. Сначала настройте self-hosted-tunnel."; exit 1; }
 
-# --- 1. найти Host alias к VPS (предлагаем кандидатов из .ssh/config) ---
+# --- 1. найти Host alias к VPS, который использует autossh (предлагаем кандидатов) ---
+# Важно: RemoteForward должен идти в Host alias autossh-туннеля (например, vps-tunnel),
+# а НЕ в обычный Host vps — иначе каждое ручное `ssh vps` будет выдавать
+# "Warning: remote port forwarding failed for listen port ...".
 CANDIDATES=$(awk '/^Host [^*]/{for(i=2;i<=NF;i++)print $i}' "$SSH_CFG" | sort -u)
 say "Хосты из ~/.ssh/config:"
 echo "$CANDIDATES" | sed 's/^/   /'
-DEFAULT_HOST="vps"
-echo "$CANDIDATES" | grep -qx "vps" || DEFAULT_HOST=$(echo "$CANDIDATES" | head -1)
-VPS_HOST=$(ask "Под каким именем VPS прописан в ~/.ssh/config?" "$DEFAULT_HOST")
+DEFAULT_HOST="vps-tunnel"
+echo "$CANDIDATES" | grep -qx "vps-tunnel" || \
+    { echo "$CANDIDATES" | grep -qx "vps" && DEFAULT_HOST="vps"; } || \
+    DEFAULT_HOST=$(echo "$CANDIDATES" | head -1)
+VPS_HOST=$(ask "В какой Host alias добавить RemoteForward (используется autossh)?" "$DEFAULT_HOST")
 grep -qE "^Host[[:space:]]+.*\b${VPS_HOST}\b" "$SSH_CFG" || { err "Host '${VPS_HOST}' не найден в $SSH_CFG"; exit 1; }
 
 LOCAL_PORT=$(ask "Локальный порт wiki.js на Mac Mini" "3010")
