@@ -7,8 +7,4 @@ wiki.thothlab.tech {
     reverse_proxy 127.0.0.1:3010 {
         header_up X-Real-IP {remote_host}
     }
-    log {
-        output file /var/log/caddy/wiki.thothlab.tech.log
-        format json
-    }
 }

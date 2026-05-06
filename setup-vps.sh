@@ -42,10 +42,6 @@ ${DOMAIN} {
     reverse_proxy 127.0.0.1:${WIKI_PORT} {
         header_up X-Real-IP {remote_host}
     }
-    log {
-        output file /var/log/caddy/${DOMAIN}.log
-        format json
-    }
 }
 # <<< wiki-thothlab <<<
 EOF
