@@ -21,11 +21,15 @@ Self-hosted [Wiki.js](https://js.wiki/) на домашнем сервере (Ma
 
 ```
 wiki-thothlab/
+├── install.sh                    # меню-лаунчер (точка входа)
+├── setup-mac.sh                  # на Mac Mini: docker stack
+├── setup-tunnel.sh               # на Mac Mini: RemoteForward в ~/.ssh/config
+├── setup-vps.sh                  # на VPS: блок в /etc/caddy/Caddyfile
 ├── compose/
-│   ├── docker-compose.yml      # wiki.js + postgres
-│   └── .env.example            # шаблон секретов
+│   ├── docker-compose.yml        # wiki.js + postgres
+│   └── .env.example              # шаблон секретов
 ├── caddy/
-│   └── wiki.thothlab.tech.caddy  # сниппет для VPS
+│   └── wiki.thothlab.tech.caddy  # сниппет для VPS (исходник)
 ├── .gitignore
 ├── LICENSE                       # MIT
 └── README.md
@@ -35,62 +39,50 @@ wiki-thothlab/
 
 ---
 
-## Развёртывание
+## Развёртывание (рекомендуемый путь)
 
-Развёртывание состоит из четырёх независимых шагов на трёх машинах. Делать в любом порядке, но Wiki будет доступен только когда выполнены все четыре.
+Один и тот же `install.sh` запускается на двух разных устройствах и сам определяет, что делать.
 
-### 1. Mac Mini — поднять стек
-
-```bash
-cd ~/Documents/Projects/wiki-thothlab/compose
-cp .env.example .env
-# отредактируйте .env — обязательно сгенерируйте POSTGRES_PASSWORD:
-#   openssl rand -base64 32
-docker compose up -d
-docker compose logs -f wiki   # дождаться "HTTP Server: [ ready ]"
-```
-
-Проверка: `curl -I http://127.0.0.1:3010` должен вернуть `200 OK` (после первой инициализации Wiki.js — редирект на `/login`).
-
-### 2. Mac Mini → VPS — добавить порт в reverse SSH-туннель
-
-В `~/.ssh/config` на Mac Mini, в блоке host'а VPS (между маркерами `# >>> self-hosted-tunnel >>>` … `# <<< self-hosted-tunnel <<<`) добавить:
-
-```sshconfig
-RemoteForward 3010 127.0.0.1:3010
-```
-
-Затем перезапустить autossh:
+### Mac Mini
 
 ```bash
-launchctl kickstart -k gui/$(id -u)/com.shaukat.autossh.tunnel
+wget -qO install.sh https://raw.githubusercontent.com/thothlab/wiki-thothlab/main/install.sh
+chmod +x install.sh
+./install.sh   # → пункт 1 (docker stack)
+./install.sh   # → пункт 2 (RemoteForward через self-hosted-tunnel)
 ```
 
-Проверка с VPS: `ssh admin@vps 'curl -I http://127.0.0.1:3010'` → `200 OK`.
+Скрипты идемпотентны: повторный запуск не ломает уже настроенное (`.env` сохраняется, блок маркеров `# >>> wiki-thothlab >>>` … `# <<< wiki-thothlab <<<` заменяется целиком).
 
-### 3. DNS — A-запись
+### VPS (под root/sudo)
 
-У регистратора `thothlab.tech` создать:
+```bash
+wget -qO install.sh https://raw.githubusercontent.com/thothlab/wiki-thothlab/main/install.sh
+sudo bash install.sh   # → пункт 3 (Caddy)
+```
+
+Caddy сам получит TLS-сертификат через Let's Encrypt при первом запросе — после того как DNS будет указывать на VPS.
+
+### DNS (вручную, у регистратора)
 
 ```
 wiki.thothlab.tech.   A   153.80.185.242
 ```
 
-Проверка: `dig +short wiki.thothlab.tech` → `153.80.185.242`.
-
-### 4. VPS — Caddy
-
-```bash
-ssh admin@vps
-sudo install -m 644 wiki.thothlab.tech.caddy /etc/caddy/conf.d/   # если используется conf.d
-# или вручную добавить содержимое в /etc/caddy/Caddyfile
-sudo caddy validate --config /etc/caddy/Caddyfile
-sudo systemctl reload caddy
-```
-
-Caddy сам получит TLS-сертификат через Let's Encrypt при первом запросе.
-
 Открыть https://wiki.thothlab.tech — должна появиться форма создания админа Wiki.js.
+
+---
+
+## Развёртывание (вручную, без install.sh)
+
+Если хочется делать руками, шаги те же:
+
+1. **Mac Mini, docker:** `cd compose && cp .env.example .env`, сгенерировать `POSTGRES_PASSWORD` (`openssl rand -base64 32`), `docker compose up -d`.
+2. **Mac Mini, туннель:** в `~/.ssh/config` в Host-блоке VPS добавить `RemoteForward 3010 127.0.0.1:3010`, перезапустить autossh (`launchctl kickstart -k gui/$(id -u)/<label>`).
+3. **DNS:** A-запись `wiki.thothlab.tech` → `153.80.185.242`.
+4. **VPS, Caddy:** скопировать `caddy/wiki.thothlab.tech.caddy` в `/etc/caddy/Caddyfile` (или импортнуть), `sudo systemctl reload caddy`.
+
+Подробности — в самих скриптах (`setup-mac.sh`, `setup-tunnel.sh`, `setup-vps.sh`).
 
 ---
 
