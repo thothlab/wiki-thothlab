@@ -1,0 +1,14 @@
+# Сниппет для /etc/caddy/Caddyfile на VPS (153.80.185.242).
+# Wiki.js слушает 127.0.0.1:3010 на Mac Mini; через reverse SSH-туннель
+# тот же порт доступен на 127.0.0.1:3010 у VPS.
+
+wiki.thothlab.tech {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:3010 {
+        header_up X-Real-IP {remote_host}
+    }
+    log {
+        output file /var/log/caddy/wiki.thothlab.tech.log
+        format json
+    }
+}

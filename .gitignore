@@ -1,0 +1,11 @@
+# Секреты
+compose/.env
+
+# Локальные данные Postgres (bind-mount)
+postgres/
+
+# macOS / редакторы
+.DS_Store
+.idea/
+.vscode/
+*.swp
